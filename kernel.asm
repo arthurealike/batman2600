@@ -61,49 +61,58 @@ Clear   dex
       lda #>JColor
       sta JColorPtr+1     
     
-StartNewFrame:
-; init bg & pf
-    lda #%01
+    ; init bg & pf
+    lda #$00
     sta COLUBK             ; bg
     lda #$A0
     sta COLUPF             ; pf
     lda #1
     sta CTRLPF             ; pf reflection
-    lda #%00000000
+    lda #0
     sta PF0                
-    lda #%00000000
+    lda #0
     sta PF1               
     lda #0
     sta PF2  
+    
+StartNewFrame
+    lda #$A0
+    sta COLUPF             ; pf
+    lda #1
 
 Vsync
     lda #2 
-    sta VBLANK
     sta VSYNC ;3  
     sta WSYNC            
     sta WSYNC            
     sta WSYNC            
     lda #0
     sta VSYNC               
-    sta VBLANK   
 
     ldx #37
-VBlank:
+VBlank
+    lda #2
+    sta VBLANK
     sta WSYNC
     dex
     bne VBlank
     
     sta WSYNC
     
+    
     lda #0 
     sta VBLANK 	; Enable TIA Output
     
 ; visible 192 lines
-GameVisibleLine:
-
-    ldx #192        ; visible scanlines
+GameVisibleLine
+    sta WSYNC
+    ldx #191        ; visible scanlines
 .GameLineLoop:     ; . local
 
+;TODO 
+; count clock cycles 
+.LeftSidePF	
+; left side pf
         lda Screen_PF0-1,X
 	sta PF0
 	lda Screen_PF1-1,X
@@ -111,10 +120,20 @@ GameVisibleLine:
 	lda Screen_PF2-1,X
 	sta PF2
         
-        SLEEP 12
-        lda #$E7
-        sta COLUPF 
+        cpx #16
+        SLEEP 6
+        bne .RightSidePF
+
+; TODO
+.DrawRoad
         
+     
+; right side pf    
+.RightSidePF
+.YellowPF        
+        lda #$E7
+        sta COLUPF   
+
 	lda Screen_PF3-1,X
 	sta PF0
 	lda Screen_PF4-1,X
@@ -122,40 +141,7 @@ GameVisibleLine:
 	lda Screen_PF5-1,X
 	sta PF2
 
-; Reserved for left side of pf
-;.IsP0Visible:       ; check if should render p0
-;      txa                      ; get line
-;      sec                      ; carry flag is set
-;      sbc P0PosY               ; subtract sprite Y coordinate
-;      cmp BAT_HEIGHT           ; sprite inside height bounds?
-;      bcc .DrawSpriteP0        ; if result < SpriteHeight, call subroutine
-;      lda #0
-;                                  ; else, set lookup index to 0
-;.DrawSpriteP0:
-;      clc                      ; clear carry flag 
-;      adc 200                  ; jump to sprite frame 
-;      tay                      ; load Y so we can work with pointer
-;
-;      ; not strecthed
-;      lda #%0000000
-;      sta NUSIZ0
-;	
-;      lda (BatSpritePtr),Y     ; load player bitmap slice of data
-;     
-;      ; sta WSYNC                ; halt cpu
-;      sta GRP0                 ; player 0 graphic
-;      lda (BatColorPtr),Y      ; correct color from table
-;     
-;      sta COLUP0               ; set color
-
-;; Reserved for right side of pf
-;.IsP1Visible:                  ; same shit as p0
-;      txa                      
-;      sec                      
-;      sbc P1PosY               
-;      cmp J_HEIGHT             
-;      bcc .DrawSpriteP1        
-;      lda #0 
+;TODO
 ;.DrawSpriteP1:
 ;      tay
 ;      lda #%0
@@ -164,7 +150,7 @@ GameVisibleLine:
 ;      sta GRP1            
 ;      lda (JColorPtr),Y   
 ;      sta COLUP1          
-
+;
      lda #$A3
      sta COLUPF
      dex 
@@ -178,13 +164,16 @@ GameVisibleLine:
 ; overscan
 Overscan:
     lda #2
-    sta VBLANK               
+    sta VBLANK
+    
+    lda #$A0
+    sta COLUPF
     REPEAT 30
         sta WSYNC            
     REPEND
     lda #0
     sta VBLANK               ; turn off VBLANK
-
+	
 ; handle Inputs
 CheckP0Up:
     lda #%00010000
@@ -253,23 +242,23 @@ SetHorizontal subroutine
 
 ; pfx line by line
 Screen_PF0
-	.byte #%11111111	; Scanline 191
-	.byte #%11111111	; Scanline 190
-	.byte #%11111111	; Scanline 189
-	.byte #%11111111	; Scanline 188
-	.byte #%11111111	; Scanline 187
-	.byte #%11111111	; Scanline 186
-	.byte #%11111111	; Scanline 185
-	.byte #%11111111	; Scanline 184
-	.byte #%11111111	; Scanline 183
-	.byte #%11111111	; Scanline 182
-	.byte #%11111111	; Scanline 181
-	.byte #%11111111	; Scanline 180
-	.byte #%11111111	; Scanline 179
-	.byte #%11111111	; Scanline 178
-	.byte #%11111111	; Scanline 177
-	.byte #%11111111	; Scanline 176
-	.byte #%11111111	; Scanline 175
+	.byte #%00000000	; Scanline 191
+	.byte #%00000000	; Scanline 190
+	.byte #%00000000	; Scanline 189
+	.byte #%00000000	; Scanline 188
+	.byte #%00000000	; Scanline 187
+	.byte #%00000000	; Scanline 186
+	.byte #%00000000	; Scanline 185
+	.byte #%00000000	; Scanline 184
+	.byte #%00000000	; Scanline 183
+	.byte #%00000000	; Scanline 182
+	.byte #%00000000	; Scanline 181
+	.byte #%00000000	; Scanline 180
+	.byte #%00000000	; Scanline 179
+	.byte #%00000000	; Scanline 178
+	.byte #%00000000	; Scanline 177
+	.byte #%00000000	; Scanline 176
+	.byte #%00000000	; Scanline 175
 	.byte #%11111111	; Scanline 174
 	.byte #%11111111	; Scanline 173
 	.byte #%11111111	; Scanline 172
@@ -447,23 +436,23 @@ Screen_PF0
 	.byte #%11111111	; Scanline 0
 
 Screen_PF1
-	.byte #%11111111	; Scanline 191
-	.byte #%11111111	; Scanline 190
-	.byte #%11111111	; Scanline 189
-	.byte #%11111111	; Scanline 188
-	.byte #%11111111	; Scanline 187
-	.byte #%11111111	; Scanline 186
-	.byte #%11111111	; Scanline 185
-	.byte #%11111111	; Scanline 184
-	.byte #%11111111	; Scanline 183
-	.byte #%11111111	; Scanline 182
-	.byte #%11111111	; Scanline 181
-	.byte #%11111111	; Scanline 180
-	.byte #%11111111	; Scanline 179
-	.byte #%11111111	; Scanline 178
-	.byte #%11111111	; Scanline 177
-	.byte #%11111111	; Scanline 176
-	.byte #%11111111	; Scanline 175
+	.byte #%00000000	; Scanline 191
+	.byte #%01000000	; Scanline 190
+	.byte #%01000000	; Scanline 189
+	.byte #%01000000	; Scanline 188
+	.byte #%01000000	; Scanline 187
+	.byte #%01000000	; Scanline 186
+	.byte #%01010000	; Scanline 185
+	.byte #%01010000	; Scanline 184
+	.byte #%01010000	; Scanline 183
+	.byte #%01010000	; Scanline 182
+	.byte #%01010000	; Scanline 181
+	.byte #%01010000	; Scanline 180
+	.byte #%01110000	; Scanline 179
+	.byte #%00000000	; Scanline 178
+	.byte #%00000000	; Scanline 177
+	.byte #%00000000	; Scanline 176
+	.byte #%00000000	; Scanline 175
 	.byte #%11111111	; Scanline 174
 	.byte #%11111111	; Scanline 173
 	.byte #%11111111	; Scanline 172
@@ -638,7 +627,7 @@ Screen_PF1
 	.byte #%11111111	; Scanline 3
 	.byte #%11111111	; Scanline 2
 	.byte #%11111111	; Scanline 1
-	.byte #%11111111	; Scanline 0
+	.byte #%00000000	; Scanline 0
 
 Screen_PF2
 	.byte #%00000000	; Scanline 191
@@ -789,15 +778,15 @@ Screen_PF2
 	.byte #%00000000	; Scanline 46
 	.byte #%00000000	; Scanline 45
 	.byte #%00000000	; Scanline 44
-	.byte #%00000000	; Scanline 43
-	.byte #%00000000	; Scanline 42
-	.byte #%00000000	; Scanline 41
-	.byte #%00000000	; Scanline 40
-	.byte #%00000000	; Scanline 39
-	.byte #%00000000	; Scanline 38
-	.byte #%00000000	; Scanline 37
-	.byte #%00000000	; Scanline 36
-	.byte #%00000000	; Scanline 35
+	.byte #%10000000	; Scanline 43
+	.byte #%10000000	; Scanline 42
+	.byte #%10000000	; Scanline 41
+	.byte #%10000000	; Scanline 40
+	.byte #%01000000	; Scanline 39
+	.byte #%01000000	; Scanline 38
+	.byte #%01000000	; Scanline 37
+	.byte #%01100000	; Scanline 36
+	.byte #%01100000	; Scanline 35
 	.byte #%00000000	; Scanline 34
 	.byte #%00000000	; Scanline 33
 	.byte #%00000000	; Scanline 32
@@ -1189,27 +1178,27 @@ Screen_PF4
 	.byte #%00000000	; Scanline 34
 	.byte #%00000000	; Scanline 33
 	.byte #%00000000	; Scanline 32
-	.byte #%00111000	; Scanline 31
-	.byte #%00111000	; Scanline 30
-	.byte #%00111000	; Scanline 29
+	.byte #%00011000	; Scanline 31
+	.byte #%00011000	; Scanline 30
+	.byte #%00011000	; Scanline 29
 	.byte #%00111000	; Scanline 28
-	.byte #%00111000	; Scanline 27
-	.byte #%00111000	; Scanline 26
-	.byte #%00111000	; Scanline 25
-	.byte #%00111000	; Scanline 24
-	.byte #%00111000	; Scanline 23
-	.byte #%00111000	; Scanline 22
-	.byte #%00111000	; Scanline 21
-	.byte #%00111000	; Scanline 20
-	.byte #%00111000	; Scanline 19
-	.byte #%00111000	; Scanline 18
-	.byte #%00111000	; Scanline 17
-	.byte #%00111000	; Scanline 16
-	.byte #%00111000	; Scanline 15
+	.byte #%00100000	; Scanline 27
+	.byte #%00100000	; Scanline 26
+	.byte #%00100000	; Scanline 25
+	.byte #%00100000	; Scanline 24
+	.byte #%00100000	; Scanline 23
+	.byte #%00100000	; Scanline 22
+	.byte #%00100000	; Scanline 21
+	.byte #%00100000	; Scanline 20
+	.byte #%00100000	; Scanline 19
+	.byte #%00100000	; Scanline 18
+	.byte #%00100000	; Scanline 17
+	.byte #%00100000	; Scanline 16
+	.byte #%00100000        ; Scanline 15
 	.byte #%00111000	; Scanline 14
 	.byte #%00111000	; Scanline 13
-	.byte #%00111000	; Scanline 12
-	.byte #%00111000	; Scanline 11
+	.byte #%00011000	; Scanline 12
+	.byte #%00011000	; Scanline 11
 	.byte #%00000000	; Scanline 10
 	.byte #%00000000	; Scanline 9
 	.byte #%00000000	; Scanline 8
@@ -1527,7 +1516,6 @@ JColor:
       .byte #$0E;
       .byte #$C2;
       .byte #$C2;
-
 
       ORG $FFFA      ; move position
       .word Reset    ; NMI vector       
