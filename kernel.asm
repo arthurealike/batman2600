@@ -18,29 +18,34 @@ JColorPtr      word        ; pointer to p1 color lookup table
 ; constants
 BAT_HEIGHT = #$10          	     
 J_HEIGHT = #$10          
+Temp = $8D
+Counter = #$0
+ScrollSpeed = #1
+AnimOffset = #0
 
       SEG code
       org $F000
 
-Reset:
-        ldx #0
+Reset:  ldx #0
         txa
-
+        
 Clear   dex
         txs
         pha
-        bne Clear              
+        bne Clear  
+        
+Init        
   ; init ram & tia registers
-      lda #10
+      lda #25
       sta P0PosY          
-      lda #0
+      lda #25
       sta P0PosX         
       lda #10
-      sta P1PosY        
+      sta P1PosY
       lda #54
       sta P1PosX       
+InitPointers
 
-  ; init pointers
       lda #<BatSprite
       sta BatSpritePtr         ; lo-byte ptr for sprite
       lda #>BatSprite
@@ -60,54 +65,61 @@ Clear   dex
       sta JColorPtr       
       lda #>JColor
       sta JColorPtr+1     
-    
-    
-    ; init bg & pf
-    lda #$A1
-    sta COLUBK             ; bg
-    lda #$A4
-    sta COLUPF             ; pf
-    lda #1
-    sta CTRLPF             ; pf reflection
-    lda #0
-    sta PF0                
-    lda #0
-    sta PF1               
-    lda #0
-    sta PF2  
-    
-    ;lda #10
-    ;pha
+        
 StartNewFrame
-    
-   ; lda #$0+1
-   ; sta COLUBK
+    lda Counter+1
+    sta Counter
+
 Vsync
     lda #2 
-    sta VSYNC ;3  
+    sta VSYNC ;3
     sta WSYNC            
     sta WSYNC            
     sta WSYNC            
     lda #0
     sta VSYNC               
 
-    ldx #37
-VBlank
-    lda #2
-    sta VBLANK
-    sta WSYNC
+    lda  #43          ; 2 cycles
+    sta  TIM64T       ; 4 cycles 
+   
+   ;; 2785 cycles Free   
+   
+   ;; START ;;  
+    inc Temp          ; Scroll Speed
+    lda Temp
+    cmp #ScrollSpeed     
+    bne Scroll_End
+    lda #$00
+    sta Temp 
+    
+    ldx #100
+Scroll
+    lsr #Screen_PF2+1,X   ; Scroll Line X-1 (= 3-0)
+    rol #Screen_PF1+1,X
+    ror #Screen_PF0+1,X
+    lda #Screen_PF0+1,X
+    and #%00001000
+    beq Scroll_1   
+    lda #Screen_PF2+1,X            
+    ora #%10000000      
+    sta #Screen_PF2+1,X
+Scroll_1               
     dex
-    bne VBlank
+    bne Scroll
+Scroll_End         
     
-    sta WSYNC
-    
-    
-    lda #0 
-    sta VBLANK 	; Enable TIA Output
+    ;; END  ;;
+
+VBlank
+     lda INTIM                 ; 4 cycles
+     bpl VBlank       ; 3 cycles (2)
+     sta WSYNC         ; 3 cycles  Total Amount = 21 cycles                         ; 2812-21 = 2791; 2791/64 = 43.60 (TIM64T)
+
+     lda #0 
+     sta VBLANK        ; Enable TIA Output
      
 ; visible 192 lines
 GameVisibleLine
-
     lda #$00          ; Clear Playfield
     sta PF0
     sta PF1
@@ -115,14 +127,11 @@ GameVisibleLine
    
     sta WSYNC
     
-    ldx #191        ; visible scanlines
+    ldx #191       ; visible scanlines
 .GameLineLoop:     ; . local
-    txa
-    asl
-   
+
 .LeftSidePF	
 ; left side pf
-      
         lda Screen_PF0-1,X
 	sta PF0
        ; ror PF0
@@ -131,24 +140,21 @@ GameVisibleLine
        ; rol PF1
 	lda Screen_PF2-1,X
 	sta PF2
-        
+  
+.IsRoadVisible  
         cpx #26
         ;SLEEP 6
         beq .DrawRoad
 ; TODO
 	jmp .RightSidePF
+;once
 .DrawRoad
         sta WSYNC
-       ; lda #$01
-       ; sta COLUBK
+       
         lda #$09
         sta COLUPF
-        lda #$01
+        lda #$02
         sta COLUBK             ; bg
-       ; lda Screen_Road-1,X
-       ; sta PF0
-       ; sta PF1
-       ; sta PF2
 
 ; right side pf    
 .RightSidePF
@@ -168,21 +174,24 @@ GameVisibleLine
      
 ;TODO
 .IsP0Visible:                  ; check if should render p0
-;      txa                      ; X to A
-;      sec                      ; carry flag is set
-;      sbc P0PosY               ; subtract sprite Y coordinate
-;      cmp BAT_HEIGHT           ; sprite inside height bounds?
-;      bcc .DrawSpriteP0        ; if result < SpriteHeight, call subroutine
-;      lda #0                   ; else, set lookup index to 0
+      txa                      ; X to A
+      sec                      ; carry flag is set
+      sbc P0PosY               ; subtract sprite Y coordinate
+      cmp BAT_HEIGHT           ; sprite inside height bounds?
+      bcc .DrawSpriteP0        ; if result < SpriteHeight, call subroutine
+      lda #0                   ; else, set lookup index to 0
 .DrawSpriteP0:
-   ;  clc                      ; clear carry flag 
-      ;adc AnimOffset          ; jump to sprite frame 
-   ;   tay                      ; load Y so we can work with pointer
+     clc                      ; clear carry flag 
+     adc AnimOffset           ; jump to sprite frame 
+     
+     tay                      ; load Y so we can work with pointer
 
-    ;  lda (BatSpritePtr),Y     ; load player bitmap slice of data
-    ;  sta GRP0                 ; set graphics for player 0
-    ;  lda (BatColorPtr),Y      ; load player color from lookup table
-    ;  sta COLUP0               ; set color for player 0 slice       bne .RightSidePF
+     lda (BatSpritePtr),Y     ; load player bitmap slice of data
+     sta GRP0                 ; set graphics for player 0
+     lda (BatColorPtr),Y      ; load player color from lookup table
+     sta COLUP0; set color for player 0 slice       bne .RightSidePF
+    
+    ; sta HMCLR
     ;  sta WSYNC                ; wait for next scanline
 
      dex 
@@ -230,16 +239,16 @@ CheckP0Left:
     lda #%01000000
     bit SWCHA
     bne CheckP0Right
-    dec P0PosX
+    ;dec P0PosX
     lda #%11111111
-    sta REFP0 
+   ; sta REFP0 
     ;; write here
 
 CheckP0Right:
     lda #%10000000
     bit SWCHA
     bne Nil
-    inc P0PosX
+    ;inc P0PosX
     lda #0
     sta REFP0
     ;; write here
@@ -259,7 +268,7 @@ Nil:    ; if input is nil
 
     jmp StartNewFrame           ; next frame
 
-; pass A, Y registers to subroutine
+; pass A, X registers to subroutine
 ; A as destination, X as sprite
 SetHorizontal subroutine
  sec
@@ -320,7 +329,7 @@ Screen_PF0
 	.byte #%00000000	; Scanline 170
 	.byte #%00000000	; Scanline 169
 	.byte #%00000000	; Scanline 168
-	.byte #%11110000	; Scanline 167
+	.byte #%00000000	; Scanline 167
 	.byte #%11110000	; Scanline 166
 	.byte #%11110000	; Scanline 165
 	.byte #%11110000	; Scanline 164
@@ -514,7 +523,7 @@ Screen_PF1
 	.byte #%00000000	; Scanline 170
 	.byte #%00000000	; Scanline 169
 	.byte #%00000000	; Scanline 168
-	.byte #%11111111	; Scanline 167
+	.byte #%00000000	; Scanline 167
 	.byte #%11111111	; Scanline 166
 	.byte #%11111111	; Scanline 165
 	.byte #%11111111	; Scanline 164
@@ -708,7 +717,7 @@ Screen_PF2
 	.byte #%00000000	; Scanline 170
 	.byte #%00000000	; Scanline 169
 	.byte #%00000000	; Scanline 168
-	.byte #%11111111	; Scanline 167
+	.byte #%00000000	; Scanline 167
 	.byte #%11111111	; Scanline 166
 	.byte #%11111111	; Scanline 165
 	.byte #%11111111	; Scanline 164
@@ -1496,6 +1505,24 @@ BatSprite1:
       .byte #%00111100
       .byte #%00111100
       .byte #%00100100
+      
+BatSprite2:
+      .byte #%00000000
+      .byte #%01100000
+      .byte #%01101100
+      .byte #%01101100
+      .byte #%01111100
+      .byte #%01101100
+      .byte #%11111100
+      .byte #%11101110
+      .byte #%11010110
+      .byte #%11111110
+      .byte #%00111000
+      .byte #%00111100
+      .byte #%00101000
+      .byte #%00111100
+      .byte #%00111100
+      .byte #%00100100      
 
 JSprite:
       .byte #%00000000
@@ -1516,8 +1543,8 @@ JSprite:
       .byte #%00111000      
 
 BatColor:
-      .byte #$00
-      .byte #$00
+      .byte #$04
+      .byte #$04
       .byte #$A5
       .byte #$04
       .byte #$04
@@ -1535,8 +1562,8 @@ BatColor:
       .byte #$04
       
 BatColor1:
-      .byte #$00
-      .byte #$00
+      .byte #$04
+      .byte #$04
       .byte #$A5
       .byte #$04
       .byte #$04
