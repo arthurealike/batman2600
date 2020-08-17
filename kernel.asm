@@ -61,8 +61,9 @@ Clear   dex
       lda #>JColor
       sta JColorPtr+1     
     
+    
     ; init bg & pf
-    lda #$A0
+    lda #$A1
     sta COLUBK             ; bg
     lda #$A4
     sta COLUPF             ; pf
@@ -75,10 +76,9 @@ Clear   dex
     lda #0
     sta PF2  
     
+    ;lda #10
+    ;pha
 StartNewFrame
-    lda #$A4
-    sta COLUPF             ; pf
-    lda #1
     
    ; lda #$0+1
    ; sta COLUBK
@@ -104,37 +104,52 @@ VBlank
     
     lda #0 
     sta VBLANK 	; Enable TIA Output
-    
+     
 ; visible 192 lines
 GameVisibleLine
+
+    lda #$00          ; Clear Playfield
+    sta PF0
+    sta PF1
+    sta PF2	
+   
     sta WSYNC
+    
     ldx #191        ; visible scanlines
 .GameLineLoop:     ; . local
-
+    txa
+    asl
+   
 .LeftSidePF	
 ; left side pf
+      
         lda Screen_PF0-1,X
 	sta PF0
+       ; ror PF0
 	lda Screen_PF1-1,X
 	sta PF1
+       ; rol PF1
 	lda Screen_PF2-1,X
 	sta PF2
         
         cpx #26
         ;SLEEP 6
-        bcc .IsP0Visible
-        
+        beq .DrawRoad
 ; TODO
+	jmp .RightSidePF
 .DrawRoad
-        lda #$01
-        sta COLUBK
+        sta WSYNC
+       ; lda #$01
+       ; sta COLUBK
         lda #$09
         sta COLUPF
+        lda #$01
+        sta COLUBK             ; bg
        ; lda Screen_Road-1,X
        ; sta PF0
        ; sta PF1
        ; sta PF2
-     
+
 ; right side pf    
 .RightSidePF
 .YellowPF        
@@ -152,17 +167,17 @@ GameVisibleLine
     ; sta COLUPF
      
 ;TODO
-.IsP0Visible:       ; check if should render p0
-      txa                      ; X to A
-      sec                      ; carry flag is set
-      sbc P0PosY               ; subtract sprite Y coordinate
-      cmp BAT_HEIGHT           ; sprite inside height bounds?
-      bcc .DrawSpriteP0        ; if result < SpriteHeight, call subroutine
-      lda #0                   ; else, set lookup index to 0
+.IsP0Visible:                  ; check if should render p0
+;      txa                      ; X to A
+;      sec                      ; carry flag is set
+;      sbc P0PosY               ; subtract sprite Y coordinate
+;      cmp BAT_HEIGHT           ; sprite inside height bounds?
+;      bcc .DrawSpriteP0        ; if result < SpriteHeight, call subroutine
+;      lda #0                   ; else, set lookup index to 0
 .DrawSpriteP0:
-      clc                      ; clear carry flag 
+   ;  clc                      ; clear carry flag 
       ;adc AnimOffset          ; jump to sprite frame 
-      tay                      ; load Y so we can work with pointer
+   ;   tay                      ; load Y so we can work with pointer
 
     ;  lda (BatSpritePtr),Y     ; load player bitmap slice of data
     ;  sta GRP0                 ; set graphics for player 0
@@ -173,20 +188,21 @@ GameVisibleLine
      dex 
      
      sta WSYNC
-     
      bne .GameLineLoop   
-     lda #%01000010 		; Disable VIA Output
+     
+     lda #%00000010 		; Disable VIA Output
      sta VBLANK       
-
 ; overscan
 Overscan:
-    lda #2
-    sta VBLANK
     
-    lda #$A4
+    lda #$00
     sta COLUPF
+    
+    lda #$A0
+    sta COLUBK
+
     REPEAT 30
-        sta WSYNC            
+      sta WSYNC            
     REPEND
     
     lda #0
@@ -304,8 +320,8 @@ Screen_PF0
 	.byte #%00000000	; Scanline 170
 	.byte #%00000000	; Scanline 169
 	.byte #%00000000	; Scanline 168
-	.byte #%00000000	; Scanline 167
-	.byte #%00000000	; Scanline 166
+	.byte #%11110000	; Scanline 167
+	.byte #%11110000	; Scanline 166
 	.byte #%11110000	; Scanline 165
 	.byte #%11110000	; Scanline 164
 	.byte #%11110000	; Scanline 163
@@ -498,8 +514,8 @@ Screen_PF1
 	.byte #%00000000	; Scanline 170
 	.byte #%00000000	; Scanline 169
 	.byte #%00000000	; Scanline 168
-	.byte #%00000000	; Scanline 167
-	.byte #%00000000	; Scanline 166
+	.byte #%11111111	; Scanline 167
+	.byte #%11111111	; Scanline 166
 	.byte #%11111111	; Scanline 165
 	.byte #%11111111	; Scanline 164
 	.byte #%11111111	; Scanline 163
@@ -692,8 +708,8 @@ Screen_PF2
 	.byte #%00000000	; Scanline 170
 	.byte #%00000000	; Scanline 169
 	.byte #%00000000	; Scanline 168
-	.byte #%00000000	; Scanline 167
-	.byte #%00000000	; Scanline 166
+	.byte #%11111111	; Scanline 167
+	.byte #%11111111	; Scanline 166
 	.byte #%11111111	; Scanline 165
 	.byte #%11111111	; Scanline 164
 	.byte #%11111111	; Scanline 163
