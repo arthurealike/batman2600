@@ -94,7 +94,8 @@ Vsync
   lda #$00
   sta Temp 
 
-  ldx #100
+ ; ldx #150
+ jmp Scroll_End
 Scroll
   lsr #Screen_PF2+1,X   ; Scroll Line X-1 (= 3-0)
   rol #Screen_PF1+1,X
@@ -109,6 +110,8 @@ Scroll_1
   dex
   bne Scroll
 Scroll_End         
+  lda #1
+  cmp IsJumping
 
 
 CheckJumping
@@ -196,7 +199,6 @@ GameVisibleLine
 .DrawSpriteP0:
    clc                      ; clear carry flag 
   ; adc AnimOffset           ; jump to sprite frame 
-
    tay                      ; load Y so we can work with pointer
 
    lda (BatSpritePtr),Y     ; load player bitmap slice of data
@@ -204,8 +206,8 @@ GameVisibleLine
    lda (BatColorPtr),Y      ; load player color from lookup table
    sta COLUP0; set color for player 0 slice       bne .RightSidePF
 
-  ; sta HMCLR
-    sta WSYNC                ; wait for next scanline
+   sta HMCLR
+   sta WSYNC                ; wait for next scanline
 
    dex 
 
@@ -256,16 +258,25 @@ CheckP0Left:
   lda #%01000000
   bit SWCHA
   bne CheckP0Right
-  ;dec P0PosX
+  lda #20
+  cmp P0PosX
+  beq .MinX
+  
+  dec P0PosX
+.MinX
   lda #%11111111
-  ; sta REFP0 
+  sta REFP0 
   ;; write here
 
 CheckP0Right:
   lda #%10000000
   bit SWCHA
   bne Nil
-  ;inc P0PosX
+  lda #90
+  cmp P0PosX
+  beq .MaxX
+  inc P0PosX
+.MaxX
   lda #0
   sta REFP0
   ;; write here
