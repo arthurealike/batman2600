@@ -19,26 +19,32 @@ JColorPtr      word        ; pointer to p1 color lookup table
 BAT_HEIGHT = #$10          	     
 J_HEIGHT = #$10          
 Temp = $8D
+CurrentFrame = $8F
 Counter = #$0
 ScrollSpeed = #1
 AnimOffset = #0
-IsJumping = #1
-IsFalling = #0
+IsJumping ds
+IsGround ds
+IsFalling = $90
 IsAnimating = #1
 
     SEG code
     org $F000
 
 Reset:  ldx #0
-      txa
+        txa
 
 Clear   dex
-      txs
-      pha
-      bne Clear  
+        txs
+        pha
+        bne Clear  
 
 Init        
 ; init ram & tia registers
+    lda #0
+    sta IsFalling
+    sta IsJumping
+ 
     lda #25
     sta P0PosY          
     lda #25
@@ -110,29 +116,37 @@ Scroll_1
   dex
   bne Scroll
 Scroll_End         
-  lda #1
-  cmp IsJumping
-
+  ;lda #1
+  ;cmp IsJumping
 
 CheckJumping
   lda IsJumping
   cmp #1
-  bcc VBlank
+  bcc .ApplyGravity
 .ApplyJumpForce
+  lda #40
+  cmp P0PosY
+  beq .ApplyGravity
   inc P0PosY
+  jmp VBlank
 
 .ApplyGravity
-  dec P0PosY
-
+  lda #0
+  sta IsJumping
+  lda #25
+  cmp P0PosY
+  beq VBlank
+  dec P0PosY   
+  
   ;; END  ;;
-
+  
 VBlank
-   lda INTIM                 ; 4 cycles
+   lda INTIM        ; 4 cycles
    bpl VBlank       ; 3 cycles (2)
-   sta WSYNC         ; 3 cycles  Total Amount = 21 cycles                         ; 2812-21 = 2791; 2791/64 = 43.60 (TIM64T)
+   sta WSYNC        ; 3 cycles  Total Amount = 21 cycles                         ; 2812-21 = 2791; 2791/64 = 43.60 (TIM64T)
 
    lda #0 
-   sta VBLANK        ; Enable TIA Output
+   sta VBLANK       ; Enable TIA Output
 
 ; visible 192 lines
 GameVisibleLine
@@ -143,17 +157,17 @@ GameVisibleLine
 
   sta WSYNC
 
-  ldx #96       ; visible scanlines
-.GameLineLoop:     ; . local
+  ldx #96           ; visible scanlines
+.GameLineLoop:      ; . local
 
 .LeftSidePF	
-; left side pf
+      ; left side pf
       lda Screen_PF0-1,X
       sta PF0
-     ; ror PF0
+      ; ror PF0
       lda Screen_PF1-1,X
       sta PF1
-     ; rol PF1
+      ; rol PF1
       lda Screen_PF2-1,X
       sta PF2
 
@@ -161,7 +175,7 @@ GameVisibleLine
       cpx #26
       ;SLEEP 6
       beq .DrawRoad
-; TODO
+      ; TODO
       jmp .RightSidePF
 ;once
 .DrawRoad
@@ -189,7 +203,7 @@ GameVisibleLine
   ; sta COLUPF
 
 ;TODO
-.IsP0Visible:                  ; check if should render p0
+.IsP0Visible:                ; check if should render p0
     txa                      ; X to A
     sec                      ; carry flag is set
     sbc P0PosY               ; subtract sprite Y coordinate
@@ -197,25 +211,26 @@ GameVisibleLine
     bcc .DrawSpriteP0        ; if result < SpriteHeight, call subroutine
     lda #0                   ; else, set lookup index to 0
 .DrawSpriteP0:
-   clc                      ; clear carry flag 
+   clc                       ; clear carry flag 
   ; adc AnimOffset           ; jump to sprite frame 
-   tay                      ; load Y so we can work with pointer
+   tay                       ; load Y so we can work with pointer
 
-   lda (BatSpritePtr),Y     ; load player bitmap slice of data
-   sta GRP0                 ; set graphics for player 0
-   lda (BatColorPtr),Y      ; load player color from lookup table
-   sta COLUP0; set color for player 0 slice       bne .RightSidePF
+   lda (BatSpritePtr),Y      ; load player bitmap slice of data
+   sta GRP0                  ; set graphics for player 0
+   lda (BatColorPtr),Y       ; load player color from lookup table
+   sta COLUP0                ; set color for player 0 slice       bne .RightSidePF
 
    sta HMCLR
-   sta WSYNC                ; wait for next scanline
+   sta WSYNC                 ; wait for next scanline
 
    dex 
 
    sta WSYNC
    bne .GameLineLoop   
 
-   lda #%00000010 		; Disable VIA Output
-   sta VBLANK       
+   lda #%00000010 	     ; Disable VIA Output
+   sta VBLANK 
+   
 ; overscan
 Overscan:
 
@@ -243,6 +258,7 @@ CheckP0Up:
   bit SWCHA
   bne CheckP0Down
   lda #1
+  cmp IsFalling
   sta IsJumping
   ;inc P0PosY 
   ;; write here
@@ -251,7 +267,10 @@ CheckP0Down:
   lda #%00100000
   bit SWCHA
   bne CheckP0Left
-;  dec P0PosY 
+  lda #25
+  cmp P0PosY
+  beq CheckP0Left
+  dec P0PosY 
   ;; write here
 
 CheckP0Left:
@@ -412,7 +431,7 @@ Screen_PF0
       .byte #%01010000	; Scanline 100
       .byte #%01010000	; Scanline 99
       .byte #%01000000	; Scanline 98
-      .byte #%01000000	; Scanline 97
+      .byte #%00000000	; Scanline 97
       .byte #%00000000	; Scanline 96
 
 Screen_PF1
