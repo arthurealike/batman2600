@@ -133,12 +133,17 @@ CheckJumping
 .ApplyGravity
   lda #0
   sta IsJumping
+  lda #0
+  sta IsFalling
   lda #25
   cmp P0PosY
   beq VBlank
   dec P0PosY   
+  lda #1
+  sta IsFalling
   
   ;; END  ;;
+  
   
 VBlank
    lda INTIM        ; 4 cycles
@@ -259,6 +264,7 @@ CheckP0Up:
   bne CheckP0Down
   lda #1
   cmp IsFalling
+  beq CheckP0Down
   sta IsJumping
   ;inc P0PosY 
   ;; write here
